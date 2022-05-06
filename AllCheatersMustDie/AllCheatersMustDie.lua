@@ -58,7 +58,7 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 		if msgDB[sender].spamCount > 50 then
 			AllCheatersMustDieDB.cheaters[sender] = msgDB[sender]
 			tinsert(tempCheaters, sender) -- needed because IsIgnored API was not returning in real time
-			SendChatMessage("Go fuck yourself." ,"WHISPER" , nil , sender);
+			SendChatMessage("Go fuck yourself.", "WHISPER", nil, sender);
 			AddIgnore(sender)
 			print("|cff00ff00[CheatersMustDie] |rDetected and ignored potential DoS attacker: ", sender,", with the following prefix: ", prefix, ", and message: ", message)
 		end
