@@ -64,7 +64,7 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 	if SettingsDB.whisperOnly and channel ~= "WHISPER" then return end
 
 	local currentTime, currentDate = GetTime(), date()
-	if sender then
+	if sender and sender ~= "" then -- sender == "" is a Warmane specific server-side message
 		if not msgDB[sender] then
 			msgDB[sender] = {
 				channel = channel,
@@ -98,14 +98,14 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 			spamCount = 0
 		})
 
-		if #processor.timestamps > 50 then
+		if #processor.timestamps > 25 then
 			tremove(processor.timestamps, 1)
 		end
 
 		-- compare timestamps
 		local tableIndex = #processor.timestamps or 1
 		if tableIndex > 1 then
-			if processor.timestamps[tableIndex].time - processor.timestamps[tableIndex - 1].time < 0.1 then
+			if processor.timestamps[tableIndex].time - processor.timestamps[tableIndex - 1].time < 0.05 then
 				processor.spamCount = processor.spamCount + 1
 			else
 				processor.spamCount = 0
@@ -113,9 +113,9 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 		end
 		processor.timestamps[tableIndex].spamCount = processor.spamCount -- add spamCount to the timestamps table for logging purposes
 
-		-- check for cheater
-		-- if event counter is greater than 50, add to cheaters list
-		if processor.spamCount > 50 then
+		-- check for potential attack
+		-- if event counter is greater than 20, add to cheaters list
+		if processor.spamCount > 20 then
 			AllCheatersMustDieDB.cheaters[sender] = processor -- add cheater and log to database
 			tinsert(tempCheaters, sender) -- needed because IsIgnored API was not returning in real time
 			AddIgnore(sender)
