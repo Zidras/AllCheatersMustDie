@@ -5,10 +5,10 @@ local AddIgnore, IsIgnored = AddIgnore, IsIgnored
 local UnitName = UnitName
 
 ACMD = {}
-
+local SettingsDB
 local ACMDframe = CreateFrame("Frame", "ACMDFrame")
 ACMDframe:RegisterEvent("ADDON_LOADED")
-ACMDframe:SetScript("OnEvent", function(self, event, addon)
+ACMDframe:SetScript("OnEvent", function(_, _, addon)
 	if addon == "AllCheatersMustDie" then
 		ACMD.Initialized = true
 		-- Initialize Database
@@ -16,40 +16,52 @@ ACMDframe:SetScript("OnEvent", function(self, event, addon)
 			AllCheatersMustDieDB = {
 				cheaters = {},
 				settings = {
-					whisperOnly = true,
+					whisperOnly = false,
 					debugEnabled = false
 				}
 			}
 		end
+		-- Repair Database from v1.0
+		if not AllCheatersMustDieDB.settings then
+			AllCheatersMustDieDB.settings = {
+				whisperOnly = true,
+				debugEnabled = false
+			}
+		end
+		SettingsDB = AllCheatersMustDieDB.settings
 	end
 end)
 
 -- Slash commands
 SLASH_ALLCHEATERSMUSTDIE1 = "/acmd"
 SlashCmdList["ALLCHEATERSMUSTDIE"] = function(msg)
-	if msg == "help" then
-		print("|cff00ff00[All Cheaters Must Die]|r has the following commands:\n-whisper\n-debug")
-	elseif msg == "whisper" then
-		AllCheatersMustDieDB.settings.whisperOnly = AllCheatersMustDieDB.settings.whisperOnly == false and true or false
-		print("|cff00ff00[All Cheaters Must Die]|r: Whisper only mode is now "..(AllCheatersMustDieDB.settings.whisperOnly and "enabled" or "disabled"))
+	if msg == "whisper" then
+		SettingsDB.whisperOnly = SettingsDB.whisperOnly == false and true or false
+		print("|cff00ff00[All Cheaters Must Die]|r: Whisper only mode is now "..(SettingsDB.whisperOnly and "enabled" or "disabled"))
 	elseif msg == "debug" then
-		AllCheatersMustDieDB.settings.debugEnabled = AllCheatersMustDieDB.settings.debugEnabled == false and true or false
-		print("|cff00ff00[All Cheaters Must Die]|r: Debug mode is now "..(AllCheatersMustDieDB.settings.debugEnabled and "enabled" or "disabled"))
+		SettingsDB.debugEnabled = SettingsDB.debugEnabled == false and true or false
+		print("|cff00ff00[All Cheaters Must Die]|r: Debug mode is now "..(SettingsDB.debugEnabled and "enabled" or "disabled"))
+	elseif msg == "reset" then
+		AllCheatersMustDieDB.cheaters = {}
+		print("|cff00ff00[All Cheaters Must Die]|r: Cheaters list has been reset")
+	else
+		print("|cff00ff00[All Cheaters Must Die]|r has the following commands:\n-|cff00ff00whisper|r : If enabled, all addon comms from channels other than \"WHISPER\" (so \"GUILD\", \"PARTY\", \"RAID\", ...) are considered safe.\n-|cff00ff00debug|r : Print all incoming addon comms in chat.\n-|cff00ff00reset|r : Clear all recorded cheaters in the database.")
 	end
 end
 
 local msgDB, tempCheaters = {}, {}
+local processor
 local function antiCheat(_, _, prefix, message, channel, sender)
 	if not ACMD.Initialized then return end
 
-	if AllCheatersMustDieDB.settings.debugEnabled then
+	if SettingsDB.debugEnabled then
 		print("|cff00ff00[All Cheaters Must Die]|r sender: " .. sender, ", with the following prefix: ", prefix, ", and message: ", message, ", on channel: ", channel)
 	end
 
 	if UnitName("player") == sender then return end
 	if IsIgnored(sender) then return end
 	if tContains(tempCheaters, sender) then return end
-	if AllCheatersMustDieDB.settings.whisperOnly and channel ~= "WHISPER" then return end
+	if SettingsDB.whisperOnly and channel ~= "WHISPER" then return end
 
 	local currentTime, currentDate = GetTime(), date()
 	if sender then
@@ -67,41 +79,44 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 		end
 
 		ACMD.Processor = msgDB -- Pass this table to the global table if it needs to be accessed
+		processor = msgDB[sender]
 
 		-- update sender table and raise event counter
-		msgDB[sender].channel = channel
-		msgDB[sender].count = msgDB[sender].count + 1
-		msgDB[sender].date = currentDate
-		msgDB[sender].time = currentTime
-		msgDB[sender].message = message
-		msgDB[sender].prefix = prefix
-		tinsert(msgDB[sender].timestamps, {
+		processor.channel = channel
+		processor.count = processor.count + 1
+		processor.date = currentDate
+		processor.time = currentTime
+		processor.message = message
+		processor.prefix = prefix
+		tinsert(processor.timestamps, {
 			channel = channel,
-			count = msgDB[sender].count,
+			count = processor.count,
 			date = currentDate,
 			time = currentTime,
 			message = message,
 			prefix = prefix,
+			spamCount = 0
 		})
 
-		if #msgDB[sender].timestamps > 50 then
-			tremove(msgDB[sender].timestamps, 1)
+		if #processor.timestamps > 50 then
+			tremove(processor.timestamps, 1)
 		end
 
 		-- compare timestamps
-		local tableIndex = #msgDB[sender].timestamps or 1
+		local tableIndex = #processor.timestamps or 1
 		if tableIndex > 1 then
-			if msgDB[sender].timestamps[tableIndex].time - msgDB[sender].timestamps[tableIndex - 1].time < 0.05 then
-				msgDB[sender].spamCount = msgDB[sender].count + 1
+			if processor.timestamps[tableIndex].time - processor.timestamps[tableIndex - 1].time < 0.1 then
+				processor.spamCount = processor.spamCount + 1
 			else
-				msgDB[sender].spamCount = 0
+				processor.spamCount = 0
 			end
 		end
+		processor.timestamps[tableIndex].spamCount = processor.spamCount -- add spamCount to the timestamps table for logging purposes
 
 		-- check for cheater
-		-- if event counter is greater than 100, add to cheaters list
-		if msgDB[sender].spamCount > 100 then
-			AllCheatersMustDieDB.cheaters[sender] = msgDB[sender]
+		-- if event counter is greater than 50, add to cheaters list
+		if processor.spamCount > 50 then
+			AllCheatersMustDieDB.cheaters[sender] = processor -- add cheater and log to database
 			tinsert(tempCheaters, sender) -- needed because IsIgnored API was not returning in real time
 			AddIgnore(sender)
 			print("|cff00ff00[All Cheaters Must Die]|r Detected and ignored potential DoS attacker: ", sender,", with the following prefix: ", prefix, ", and message: ", message)
