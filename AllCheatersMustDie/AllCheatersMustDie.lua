@@ -11,6 +11,7 @@ ACMDframe:RegisterEvent("ADDON_LOADED")
 ACMDframe:SetScript("OnEvent", function(_, _, addon)
 	if addon == "AllCheatersMustDie" then
 		ACMD.Initialized = true
+		ACMD.Version = GetAddOnMetadata("AllCheatersMustDie", "Version")
 		-- Initialize Database
 		if not AllCheatersMustDieDB then
 			AllCheatersMustDieDB = {
@@ -75,6 +76,7 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 				prefix = prefix,
 				spamCount = 0,
 				timestamps = {},
+				version = ACMD.Version
 			}
 		end
 
