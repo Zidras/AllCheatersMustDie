@@ -45,6 +45,8 @@ SlashCmdList["ALLCHEATERSMUSTDIE"] = function(msg)
 	elseif msg == "reset" then
 		AllCheatersMustDieDB.cheaters = {}
 		print("|cff00ff00[All Cheaters Must Die]|r: Cheaters list has been reset")
+	elseif msg == "version" then
+		print("|cff00ff00[All Cheaters Must Die]|r Version ", ACMD.Version)
 	else
 		print("|cff00ff00[All Cheaters Must Die]|r has the following commands:\n-|cff00ff00whisper|r : If enabled, all addon comms from channels other than \"WHISPER\" (so \"GUILD\", \"PARTY\", \"RAID\", ...) are considered safe.\n-|cff00ff00debug|r : Print all incoming addon comms in chat.\n-|cff00ff00reset|r : Clear all recorded cheaters in the database.")
 	end
@@ -59,70 +61,69 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 		print("|cff00ff00[All Cheaters Must Die]|r sender: " .. sender, ", with the following prefix: ", prefix, ", and message: ", message, ", on channel: ", channel)
 	end
 
+	if not sender or sender == "" then return end -- sender == "" is a Warmane specific server-side message
 	if UnitName("player") == sender then return end
 	if IsIgnored(sender) then return end
 	if tContains(tempCheaters, sender) then return end
 	if SettingsDB.whisperOnly and channel ~= "WHISPER" then return end
 
 	local currentTime, currentDate = GetTime(), date()
-	if sender and sender ~= "" then -- sender == "" is a Warmane specific server-side message
-		if not msgDB[sender] then
-			msgDB[sender] = {
-				channel = channel,
-				count = 0,
-				date = currentDate,
-				time = currentTime,
-				message = message,
-				prefix = prefix,
-				spamCount = 0,
-				timestamps = {},
-				version = ACMD.Version
-			}
-		end
-
-		ACMD.Processor = msgDB -- Pass this table to the global table if it needs to be accessed
-		processor = msgDB[sender]
-
-		-- update sender table and raise event counter
-		processor.channel = channel
-		processor.count = processor.count + 1
-		processor.date = currentDate
-		processor.time = currentTime
-		processor.message = message
-		processor.prefix = prefix
-		tinsert(processor.timestamps, {
+	if not msgDB[sender] then
+		msgDB[sender] = {
 			channel = channel,
-			count = processor.count,
+			count = 0,
 			date = currentDate,
 			time = currentTime,
 			message = message,
 			prefix = prefix,
-			spamCount = 0
-		})
+			spamCount = 0,
+			timestamps = {},
+			version = ACMD.Version
+		}
+	end
 
-		if #processor.timestamps > 25 then
-			tremove(processor.timestamps, 1)
-		end
+	ACMD.Processor = msgDB -- Pass this table to the global table if it needs to be accessed
+	processor = msgDB[sender]
 
-		-- compare timestamps
-		local tableIndex = #processor.timestamps or 1
-		if tableIndex > 1 then
-			if processor.timestamps[tableIndex].time - processor.timestamps[tableIndex - 1].time < 0.05 then
-				processor.spamCount = processor.spamCount + 1
-			else
-				processor.spamCount = 0
-			end
-		end
-		processor.timestamps[tableIndex].spamCount = processor.spamCount -- add spamCount to the timestamps table for logging purposes
+	-- update sender table and raise event counter
+	processor.channel = channel
+	processor.count = processor.count + 1
+	processor.date = currentDate
+	processor.time = currentTime
+	processor.message = message
+	processor.prefix = prefix
+	tinsert(processor.timestamps, {
+		channel = channel,
+		count = processor.count,
+		date = currentDate,
+		time = currentTime,
+		message = message,
+		prefix = prefix,
+		spamCount = 0
+	})
 
-		-- check for potential attack
-		-- if event counter is greater than 20, add to cheaters list
-		if processor.spamCount > 20 then
-			AllCheatersMustDieDB.cheaters[sender] = processor -- add cheater and log to database
-			tinsert(tempCheaters, sender) -- needed because IsIgnored API was not returning in real time
-			AddIgnore(sender)
-			print("|cff00ff00[All Cheaters Must Die]|r Detected and ignored potential DoS attacker: ", sender,", with the following prefix: ", prefix, ", and message: ", message)
+	if #processor.timestamps > 25 then
+		tremove(processor.timestamps, 1)
+	end
+
+	-- compare timestamps
+	local tableIndex = #processor.timestamps or 1
+	if tableIndex > 1 then
+		if processor.timestamps[tableIndex].time - processor.timestamps[tableIndex - 1].time < 0.05 then
+			processor.spamCount = processor.spamCount + 1
+		else
+			processor.spamCount = 0
 		end
+	end
+	processor.timestamps[tableIndex].spamCount = processor.spamCount -- add spamCount to the timestamps table for logging purposes
+
+	-- check for potential attack
+	-- if event counter is greater than 20, add to cheaters list
+	if processor.spamCount > 20 then
+		AllCheatersMustDieDB.cheaters[sender] = processor -- add cheater and log to database
+		tinsert(tempCheaters, sender) -- needed because IsIgnored API was not returning in real time
+		AddIgnore(sender)
+		print("|cff00ff00[All Cheaters Must Die]|r Detected and ignored potential DoS attacker: ", sender,", with the following prefix: ", prefix, ", and message: ", message, ". Log will be saved to WTF\\Account\\<accountname>\\SavedVariables\\AllCheatersMustDie.lua once you relog or reload.")
 	end
 end
 
