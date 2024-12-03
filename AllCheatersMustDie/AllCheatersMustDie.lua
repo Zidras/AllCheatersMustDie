@@ -102,7 +102,7 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 		spamCount = 0
 	})
 
-	if #processor.timestamps > 25 then
+	if #processor.timestamps > 40 then
 		tremove(processor.timestamps, 1)
 	end
 
@@ -118,8 +118,8 @@ local function antiCheat(_, _, prefix, message, channel, sender)
 	processor.timestamps[tableIndex].spamCount = processor.spamCount -- add spamCount to the timestamps table for logging purposes
 
 	-- check for potential attack
-	-- if event counter is greater than 20, add to cheaters list
-	if processor.spamCount > 20 then
+	-- if event counter is greater than 50, add to cheaters list
+	if processor.spamCount > 50 then
 		AllCheatersMustDieDB.cheaters[sender] = processor -- add cheater and log to database
 		tinsert(tempCheaters, sender) -- needed because IsIgnored API was not returning in real time
 		AddIgnore(sender)
