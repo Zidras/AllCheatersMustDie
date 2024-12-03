@@ -5,7 +5,7 @@
 ## LoadOnDemand: 0
 ## DefaultState: enabled
 ## Author: Zidras
-## Version: 1.1
+## Version: 1.2
 ## X-Website: https://github.com/Zidras/AllCheatersMustDie/
 
 AllCheatersMustDie.lua
